@@ -38,3 +38,4 @@ A simple dynamically typed and sized hashmap in C
 - work in progress, as mentioned above I'm  experimenting with a few ideas
 - tyring out single-header file libraries idea in C, see includes.h 
 - TODO: clean up & improve tests, rethink type aliasing, error handling, string support, more docs, etc.
+- hash function is MurmurHash2, by Austin Appleby
