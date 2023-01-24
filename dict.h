@@ -102,8 +102,7 @@ void *dict_malloc(size_t num_bytes) {
 
 #define EMPTY UINT32_MAX
 #define DELETED (UINT32_MAX -1)
-#define ENTRY_NOT_FOUND (UINT32_MAX -2)
-#define KEY_ALREADY_EXISTS (UINT32_MAX -3)
+#define KEY_ALREADY_EXISTS (UINT32_MAX -2)
 
 // dynamic array
 #define arr__hdr(a) ((ArrHdr *)((char *)(a) - offsetof(ArrHdr, arr))) 
