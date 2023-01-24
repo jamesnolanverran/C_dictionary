@@ -24,8 +24,8 @@ typedef struct ArrHdr {
 // dictionary
 typedef struct DictEntry { 
     uint32_t data_index;
-    uint32_t keys_index;
     uint32_t entry_indices_index; // added to speed up deletions / avoid linear search
+    char *key; 
     uint32_t hash; 
 } DictEntry;
 
@@ -37,11 +37,9 @@ typedef struct DictHdr {
 
     uint32_t *deleted_entry_indices;  // TODO: not implemented
     uint32_t *deleted_data_indices;// will re-use slots in the dict after deletions
-    uint32_t *deleted_keys; 
 
     uint32_t *entry_indices; // an arr of all dict entry locations by index, used for realloc 
     DictEntry *entries; // the actual hashtable - contains an index to data[]  
-    char **keys; // arr of c-strings
     char data[];  // where the raw data is stored
 } DictHdr;
 
@@ -164,11 +162,10 @@ char *arr__printf(char *arr, const char *fmt, ...) {
 #define dict__hdr(d) ((DictHdr *)((char *)(d) - offsetof(DictHdr, data))) 
 #define dict_temp_idx(d) ((d) ? dict__hdr(d)->temp_idx : EMPTY) 
 #define dict_cap(d) ((d) ? dict__hdr(d)->cap : 0)
-#define dict_keys_arr(d) ((d) ? dict__hdr(d)->keys : 0)
 #define dict_entries(d) ((d) ? dict__hdr(d)->entries : 0)
 
 #define dict_idx_to_val(d,idx) ( (d)[ dict_entries(d)[idx].data_index ] )  
-#define dict_key(d,idx) ( dict_keys_arr(d)[ dict_entries(d)[idx].keys_index ] )  // dict_idx_to_key?  todo: needed?
+#define dict_key(d,idx) (dict_entries(d)[(idx)].key)  // dict_idx_to_key?  todo: needed?
 
 #define dict_len(d) ((d) ? dict__hdr(d)->len : 0)
 #define dict_end(d) ((d) + dict_len(d)) // todo: needed? 
@@ -241,13 +238,11 @@ void dict__delete(void *dict) {  // return a success fail code?
     DictEntry *entry = &d->entries[d->temp_idx];
     arr_push(d->deleted_data_indices, entry->data_index); // TODO: not implemented: recycling slots, & sync lengths of deleted nodes etc.
     arr_push(d->deleted_entry_indices, entry->entry_indices_index);
-    arr_push(d->deleted_keys, entry->keys_index);
 
-    d->keys[entry->keys_index] = NULL;
     d->entry_indices[entry->entry_indices_index] = DELETED;
 
     entry->data_index = DELETED;
-    entry->keys_index = DELETED;
+    entry->key = NULL; // todo: free keys
     entry->entry_indices_index = DELETED;
     entry->hash = DELETED;
 
@@ -281,7 +276,6 @@ uint32_t dict__find_empty_slot(DictEntry *entries, uint32_t hash, uint32_t capac
 bool dict__insert_entry(void *dict, char *key){ 
     DictHdr *d = dict__hdr(dict);
     uint32_t data_index = dict_len(dict);
-    uint32_t key_index = arr_len(d->keys);
     uint32_t hash = generate_hash(key);
     uint32_t entry_index = dict__find_empty_slot(d->entries, hash, dict_cap(dict));
     if(entry_index == KEY_ALREADY_EXISTS){
@@ -291,8 +285,7 @@ bool dict__insert_entry(void *dict, char *key){
     arr_push(d->entry_indices, entry_index); // keep a list of dict entries
     char *new_key = NULL;
     arr_printf(new_key, key);
-    arr_push(d->keys, new_key); // keep a list of keys
-    d->entries[entry_index] = (DictEntry){data_index, key_index, entry_indices_index, hash};  
+    d->entries[entry_index] = (DictEntry){data_index, entry_indices_index, new_key, hash};  
     return true;
 }
 uint32_t dict__index(uint32_t capacity, char *key){ 
@@ -354,11 +347,9 @@ void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) {
         new_hdr->len = 0;
         new_hdr->temp_idx = EMPTY;
         new_hdr->deleted_data_indices = NULL;
-        new_hdr->deleted_keys = NULL;
         new_hdr->deleted_entry_indices = NULL;
         new_hdr->entry_indices = NULL;
         new_hdr->entries = NULL;
-        new_hdr->keys = NULL;
     } else {
         new_hdr = (DictHdr*)dict_realloc(dict__hdr(dict), data_size);
     }
@@ -378,8 +369,10 @@ bool dict_key_exists(void *dict, char *key){
 char **dict_keys(void *dict){  
     DictHdr *d = dict__hdr(dict);
     char **result = NULL;
-    for(char **k = d->keys; k != arr_end(d->keys); k++){ 
-        if(*k) arr_push(result, *k);
+    for(uint32_t *e = d->entry_indices; e != arr_end(d->entry_indices); e++){ 
+        if(*e != DELETED){
+            arr_push(result, d->entries[*e].key);
+        }
     }
     return result;
 }
@@ -388,10 +381,8 @@ void dict__free(void *dict){
     if(d){
         if(d->deleted_entry_indices) arr_free(d->deleted_entry_indices);
         if(d->deleted_data_indices) arr_free(d->deleted_data_indices);
-        if(d->deleted_keys) arr_free(d->deleted_keys);
         if(d->entry_indices) arr_free(d->entry_indices);
-        if(d->keys) arr_free(d->keys);
-        if(d->entries) free(d->entries);
+        if(d->entries) free(d->entries); // todo: free keys? 
         free(dict__hdr(dict));
     }
 }
