@@ -17,6 +17,7 @@
 
 ### Example: 
 ```c
+    #define DICT_H_IMPLEMENTATION
     include "dict.h"
 
     // initialize a var with type
