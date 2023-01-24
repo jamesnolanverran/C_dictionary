@@ -1,14 +1,8 @@
-#include <stdint.h> 
-#include <assert.h>
-#include <stdarg.h> 
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <string.h> 
-#include <stdbool.h> 
+#define DICT_H_IMPLEMENTATION
+#include "stdio.h"
+#include "dict.h"
 
-#include "includes.h"
-
-i32 main(i32 argc, char **argv) {
+int main(int argc, char **argv) {
     // test_dict();
 
     int *new_dictionary = NULL;
@@ -21,7 +15,7 @@ i32 main(i32 argc, char **argv) {
 
     *result +=1; // update the dict 
 
-    result = dict_get(new_dictionary, "new_entry"); // to show that it was updated
+    result = dict_get(new_dictionary, "new_entry"); // (to show that it was updated)
     printf("result: %d\n", *result);
 
     dict_free(new_dictionary);
