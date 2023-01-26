@@ -17,7 +17,7 @@
 typedef struct ArrHdr {
     uint32_t len;
     uint32_t cap;
-    char arr[0]; 
+    char arr[]; 
     
 } ArrHdr;
 
@@ -25,7 +25,7 @@ typedef struct ArrHdr {
 typedef struct DictEntry { 
     uint32_t data_index;
     uint32_t entry_indices_index; // added to speed up deletions / avoid linear search
-    char *key; 
+    char *key;  // todo: change key strategy.
     uint32_t hash; 
 } DictEntry;
 
@@ -34,9 +34,6 @@ typedef struct DictHdr {
     uint32_t cap;
     uint32_t data_cap; // not required, used for debugging allocation
     uint32_t temp_idx; // used to store an index used by macros
-
-    uint32_t *deleted_entry_indices;  // TODO: not implemented
-    uint32_t *deleted_data_indices;// will re-use slots in the dict after deletions
 
     uint32_t *entry_indices; // an arr of all dict entry locations by index, used for realloc 
     DictEntry *entries; // the actual hashtable - contains an index to data[]  
@@ -236,13 +233,11 @@ void dict__delete(void *dict) {  // return a success fail code?
     DictHdr *d = dict__hdr(dict);
 
     DictEntry *entry = &d->entries[d->temp_idx];
-    arr_push(d->deleted_data_indices, entry->data_index); // TODO: not implemented: recycling slots, & sync lengths of deleted nodes etc.
-    arr_push(d->deleted_entry_indices, entry->entry_indices_index);
 
     d->entry_indices[entry->entry_indices_index] = DELETED;
 
     entry->data_index = DELETED;
-    entry->key = NULL; // todo: free keys
+    arr_free(entry->key);
     entry->entry_indices_index = DELETED;
     entry->hash = DELETED;
 
@@ -346,8 +341,6 @@ void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) {
         new_hdr = (DictHdr*)dict_malloc(data_size);
         new_hdr->len = 0;
         new_hdr->temp_idx = EMPTY;
-        new_hdr->deleted_data_indices = NULL;
-        new_hdr->deleted_entry_indices = NULL;
         new_hdr->entry_indices = NULL;
         new_hdr->entries = NULL;
     } else {
@@ -379,10 +372,13 @@ char **dict_keys(void *dict){
 void dict__free(void *dict){
     DictHdr *d = dict__hdr(dict);
     if(d){
-        if(d->deleted_entry_indices) arr_free(d->deleted_entry_indices);
-        if(d->deleted_data_indices) arr_free(d->deleted_data_indices);
+        if(d->entries) {
+            for(uint32_t *e = d->entry_indices; e != arr_end(d->entry_indices); e++){
+                if(*e != DELETED) arr_free(d->entries[*e].key);
+            }
+            free(d->entries); 
+        }
         if(d->entry_indices) arr_free(d->entry_indices);
-        if(d->entries) free(d->entries); // todo: free keys? 
         free(dict__hdr(dict));
     }
 }

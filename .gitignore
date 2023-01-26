@@ -1,5 +1,6 @@
 .vscode/*
 build.bat
+*.org
 
 # Prerequisites
 *.d
