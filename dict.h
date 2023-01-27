@@ -14,45 +14,45 @@
 // https://www.youtube.com/playlist?list=PLU94OURih-CiP4WxKSMt3UcwMSDM3aTtX
 // based on Sean Barrett's stretchy buffers https://github.com/nothings/stb
 
+#ifndef ARR_H // todo: seperate out arr.h  ?
+
 typedef struct ArrHdr {
     uint32_t len;
     uint32_t cap;
     char arr[]; 
-    
 } ArrHdr;
+
+void *arr_calloc(size_t num_elems, size_t elem_size);
+void *arr_realloc(void *ptr, size_t num_bytes);
+void *arr_malloc(size_t num_bytes);
+
+void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size);
+char *arr__printf(char *arr, const char *fmt, ...);
+void arr_test(void);
+
+#endif // ARR_H
 
 // dictionary
 typedef struct DictEntry { 
     uint32_t data_index;
-    char *key;  // todo: change key strategy.
+    char *key;  
     uint32_t hash; 
 } DictEntry;
 
 typedef struct DictHdr {
     uint32_t len; 
     uint32_t cap;
-    uint32_t data_cap; // not required, used for debugging allocation
     uint32_t temp_idx; // used to store an index used by macros
-
     uint32_t *entry_indices; // an arr of all dict entry locations by index, used for realloc 
     DictEntry *entries; // the actual hashtable - contains an index to data[]  
     char data[];  // where the raw data is stored
 } DictHdr;
 
-void *dict_calloc(size_t num_elems, size_t elem_size);
-void *dict_realloc(void *ptr, size_t num_bytes);
-void *dict_malloc(size_t num_bytes);
-
-void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size);
-char *arr__printf(char *arr, const char *fmt, ...);
-void arr_test(void);
-
-uint32_t murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed );
-uint32_t generate_hash(char *str);
+uint32_t dict__murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed );
+uint32_t dict__generate_hash(char *str);
 void dict__delete(void *dict);
 uint32_t dict__find_empty_slot(DictEntry *entries, uint32_t hash, uint32_t capacity);
 bool dict__insert_entry(void *dict, char *key);
-uint32_t dict__index(uint32_t capacity, char *key);
 bool dict__find_hash(void *dict, char *key);
 void dict__grow_entries(void *dict, size_t elem_size);
 void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) ;
@@ -64,43 +64,38 @@ void test_dict(void);
 #ifdef DICT_H_IMPLEMENTATION
 /////////////////////////////
 
-// utils
+// dynamic array & alloc wrappers
+#ifndef ARR_H  
+#define ARR_H
+
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
 
-void *dict_calloc(size_t num_elems, size_t elem_size) {
+void *arr_calloc(size_t num_elems, size_t elem_size) {
     void *ptr = calloc(num_elems, elem_size);
     if (!ptr) {
-        perror("dict_calloc failed");
+        perror("arr_calloc failed");
         exit(1);
     }
     return ptr;
 }
-void *dict_realloc(void *ptr, size_t num_bytes) {
+void *arr_realloc(void *ptr, size_t num_bytes) {
     ptr = realloc(ptr, num_bytes);
     if (!ptr) {
-        perror("dict_realloc failed");
+        perror("arr_realloc failed");
         exit(1);
     }
     return ptr;
 }
-void *dict_malloc(size_t num_bytes) {
+void *arr_malloc(size_t num_bytes) {
     void *ptr = malloc(num_bytes);
     if (!ptr) {
-        perror("dict_malloc failed");
+        perror("arr_malloc failed");
         exit(1);
     }
     return ptr;
 }
-
-
-#define EMPTY UINT32_MAX
-#define DELETED (UINT32_MAX -1)
-#define KEY_ALREADY_EXISTS (UINT32_MAX -2)
-
-// dynamic array
 #define arr__hdr(a) ((ArrHdr *)((char *)(a) - offsetof(ArrHdr, arr))) 
-
 #define arr_len(a) ((a) ? arr__hdr(a)->len : 0)
 #define arr_cap(a) ((a) ? arr__hdr(a)->cap : 0)
 #define arr_end(a) ((a) + arr_len(a))
@@ -125,9 +120,9 @@ void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size) {
     new_size = new_size + (new_size % 2);
     ArrHdr *new_hdr;
     if (arr) {
-        new_hdr = dict_realloc(arr__hdr(arr), new_size);
+        new_hdr = arr_realloc(arr__hdr(arr), new_size);
     } else {
-        new_hdr = dict_malloc(new_size);
+        new_hdr = arr_malloc(new_size);
         new_hdr->len = 0;
     }   
     new_hdr->cap = new_cap;
@@ -151,17 +146,22 @@ char *arr__printf(char *arr, const char *fmt, ...) {
     arr__hdr(arr)->len += n - 1;
     return arr;
 }
+#endif // ALLOC_H
 
 //////////////////
 // c_dictionary
 /////////////////
+#define EMPTY UINT32_MAX
+#define DELETED (UINT32_MAX -1)
+#define KEY_ALREADY_EXISTS (UINT32_MAX -2)
+
 #define dict__hdr(d) ((DictHdr *)((char *)(d) - offsetof(DictHdr, data))) 
 #define dict_temp_idx(d) ((d) ? dict__hdr(d)->temp_idx : EMPTY) // EMPTY is unreachable
 #define dict_cap(d) ((d) ? dict__hdr(d)->cap : 0)
 #define dict_entries(d) ((d) ? dict__hdr(d)->entries : 0)
 
 #define dict_idx_to_val(d,idx) ( (d)[ dict_entries(d)[(idx)].data_index ] )  
-#define dict_key(d,idx) (dict_entries(d)[(idx)].key)  // dict_idx_to_key?  todo: needed?
+#define dict_key(d,idx) (dict_entries(d)[(idx)].key)  // todo: dict_idx_to_key?  needed?
 
 #define dict_len(d) ((d) ? dict__hdr(d)->len : 0)
 #define dict_end(d) ((d) + dict_len(d)) 
@@ -176,13 +176,13 @@ char *arr__printf(char *arr, const char *fmt, ...) {
 #define dict_update(d,k,v) ( dict__find_hash((d), (k)) ? *(&dict_idx_to_val((d), dict_temp_idx(d))) = (v), true : false ) // false if key doesn't exist
   // do I need this? I can update the value directly after via dict_get
 #define dict_delete(d,k) (dict__find_hash((d), (k)) ?   \
-                         ((d)[dict_entries(d)[dict_temp_idx(d)].data_index] = (d)[dict_len(d) - 1], dict__delete((d)), true) : false) 
+                         ((d)[ dict_entries(d)[dict_temp_idx(d)].data_index ] = (d)[dict_len(d) - 1], dict__delete((d)), true) : false) 
 
 #define dict_get_or_set(d,k,v) ( dict__find_hash((d), (k)) ?                        \
                                ( &dict_idx_to_val((d), dict_temp_idx(d))) :         \
                                ( (dict_insert((d), (k), (v))), dict_get((d), (k))) )
 
-uint32_t murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed )
+uint32_t dict__murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed )
 {
   const uint32_t m = 0x5bd1e995;
   const int r = 24;
@@ -215,12 +215,12 @@ uint32_t murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed )
 
   return h;
 } 
-uint32_t generate_hash(char *str)
+uint32_t dict__generate_hash(char *str)
 {
-    return murmer_hash_2(str, (uint32_t)strlen(str), 5381);
+    return dict__murmer_hash_2(str, (uint32_t)strlen(str), 5381);
 }
 
-void dict__delete(void *dict) {  // return a success fail code?  
+void dict__delete(void *dict) {  
     DictHdr *d = dict__hdr(dict);
 
     DictEntry *e = &d->entries[d->temp_idx];
@@ -237,7 +237,7 @@ void dict__delete(void *dict) {  // return a success fail code?
     arr_free(e->key);
     e->hash = DELETED;
 
-    d->len--; 
+    d->len -= 1;
     d->temp_idx = EMPTY;
 }
 
@@ -247,9 +247,7 @@ uint32_t dict__find_empty_slot(DictEntry *entries, uint32_t hash, uint32_t capac
     uint32_t existing_hash; 
     while(true){
         if( j-- == 0) assert(false); // unreachable
-
         existing_hash = entries[idx].hash;
-
         if(existing_hash == hash){
             return KEY_ALREADY_EXISTS;
         }
@@ -267,7 +265,7 @@ uint32_t dict__find_empty_slot(DictEntry *entries, uint32_t hash, uint32_t capac
 bool dict__insert_entry(void *dict, char *key){ 
     DictHdr *d = dict__hdr(dict);
     uint32_t data_index = dict_len(dict);
-    uint32_t hash = generate_hash(key);
+    uint32_t hash = dict__generate_hash(key);
     uint32_t entry_index = dict__find_empty_slot(d->entries, hash, dict_cap(dict));
     if(entry_index == KEY_ALREADY_EXISTS){
         return false;
@@ -278,16 +276,10 @@ bool dict__insert_entry(void *dict, char *key){
     d->entries[entry_index] = (DictEntry){data_index, new_key, hash};  
     return true;
 }
-uint32_t dict__index(uint32_t capacity, char *key){ 
-    uint32_t h;
-    h = generate_hash(key);
-    h = h % capacity;
-    return h; 
-}
 bool dict__find_hash(void *dict, char *key){
     // puts the result in d->temp_idx and returns true. Otherwise false.
     DictHdr *d = dict__hdr(dict);
-    uint32_t hash = generate_hash(key);
+    uint32_t hash = dict__generate_hash(key);
     uint32_t idx = hash % d->cap;
     uint32_t j = d->cap;
     uint32_t candidate_hash;
@@ -312,7 +304,7 @@ void dict__grow_entries(void *dict, size_t elem_size){
     uint32_t new_cap = dict_cap(dict);
     uint32_t new_size = new_cap * (uint32_t)elem_size;
     assert(new_size % 4 == 0);
-    DictEntry *new_entries = (DictEntry*)dict_malloc(new_size);
+    DictEntry *new_entries = arr_malloc(new_size);
     memset(new_entries, 0xff, new_size); 
     if (dict_len(dict)) { 
         uint32_t *new_entry_indices = NULL;
@@ -333,22 +325,21 @@ void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) {
     assert(data_size % 4 == 0);
     DictHdr *new_hdr;
     if (!dict) { 
-        new_hdr = (DictHdr*)dict_malloc(data_size);
+        new_hdr = arr_malloc(data_size);
         new_hdr->len = 0;
         new_hdr->temp_idx = EMPTY;
         new_hdr->entry_indices = NULL;
         new_hdr->entries = NULL;
     } else {
-        new_hdr = (DictHdr*)dict_realloc(dict__hdr(dict), data_size);
+        new_hdr = arr_realloc(dict__hdr(dict), data_size);
     }
-    new_hdr->data_cap = data_cap;
     new_hdr->cap = new_cap;
     dict__grow_entries(new_hdr->data, sizeof(DictEntry));
     return new_hdr->data;
 }
 bool dict_key_exists(void *dict, char *key){
     DictHdr *d = dict__hdr(dict);
-    uint32_t hash = generate_hash(key);
+    uint32_t hash = dict__generate_hash(key);
     if(dict__find_empty_slot(d->entries, hash, dict_cap(dict)) == KEY_ALREADY_EXISTS) {
         return true;
     }

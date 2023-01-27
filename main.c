@@ -1,9 +1,10 @@
-#define DICT_H_IMPLEMENTATION
 #include "stdio.h"
+
+#define DICT_H_IMPLEMENTATION
 #include "dict.h"
 
 int main(int argc, char **argv) {
-    // test_dict();
+    test_dict();
 
     int *new_dictionary = NULL;
     
