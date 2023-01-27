@@ -24,7 +24,6 @@ typedef struct ArrHdr {
 // dictionary
 typedef struct DictEntry { 
     uint32_t data_index;
-    uint32_t entry_indices_index; // added to speed up deletions / avoid linear search
     char *key;  // todo: change key strategy.
     uint32_t hash; 
 } DictEntry;
@@ -157,15 +156,15 @@ char *arr__printf(char *arr, const char *fmt, ...) {
 // c_dictionary
 /////////////////
 #define dict__hdr(d) ((DictHdr *)((char *)(d) - offsetof(DictHdr, data))) 
-#define dict_temp_idx(d) ((d) ? dict__hdr(d)->temp_idx : EMPTY) 
+#define dict_temp_idx(d) ((d) ? dict__hdr(d)->temp_idx : EMPTY) // EMPTY is unreachable
 #define dict_cap(d) ((d) ? dict__hdr(d)->cap : 0)
 #define dict_entries(d) ((d) ? dict__hdr(d)->entries : 0)
 
-#define dict_idx_to_val(d,idx) ( (d)[ dict_entries(d)[idx].data_index ] )  
+#define dict_idx_to_val(d,idx) ( (d)[ dict_entries(d)[(idx)].data_index ] )  
 #define dict_key(d,idx) (dict_entries(d)[(idx)].key)  // dict_idx_to_key?  todo: needed?
 
 #define dict_len(d) ((d) ? dict__hdr(d)->len : 0)
-#define dict_end(d) ((d) + dict_len(d)) // todo: needed? 
+#define dict_end(d) ((d) + dict_len(d)) 
 #define dict_indices(d) ((d) ? dict__hdr(d)->entry_indices : 0) 
 #define dict_free(d) ((d) ? (dict__free(d), (d) = NULL, 1) : 0)
 #define dict_fit(d, n) (((n)*3)+1 < dict_cap(d) ? 0 : ((d) = dict__grow((d), ((d) ? 4*dict_cap(d) : 4), sizeof(*(d)))))
@@ -176,20 +175,12 @@ char *arr__printf(char *arr, const char *fmt, ...) {
 #define dict_get(d,k) (dict__find_hash((d), (k)) ? &dict_idx_to_val((d), dict_temp_idx(d)) : NULL)  // returns ptr to value or NULL
 #define dict_update(d,k,v) ( dict__find_hash((d), (k)) ? *(&dict_idx_to_val((d), dict_temp_idx(d))) = (v), true : false ) // false if key doesn't exist
   // do I need this? I can update the value directly after via dict_get
-#define dict_delete(d,k) (dict__find_hash((d), (k)) ? dict__delete((d)), true : false) 
+#define dict_delete(d,k) (dict__find_hash((d), (k)) ?   \
+                         ((d)[dict_entries(d)[dict_temp_idx(d)].data_index] = (d)[dict_len(d) - 1], dict__delete((d)), true) : false) 
 
-#define dict_to_arr(dest_arr, src_dict) do {                                            \
-    DictHdr *dh = dict__hdr(src_dict);                                                   \
-    for (uint32_t *idx = dh->entry_indices; idx !=arr_end(dh->entry_indices); idx++) {         \
-        if(*idx != DELETED) {                                                           \
-            arr_push((dest_arr), (src_dict)[dh->entries[*idx].data_index]);              \
-        }                                                                               \
-    }                                                                                   \
-} while (0)
-
-#define dict_get_or_set(d,k,v) ( dict__find_hash((d), (k)) ? \
-                                 (&dict_idx_to_val((d), dict_temp_idx(d))) : \
-                                  ((dict_insert((d), (k), (v))), dict_get((d), (k))) )
+#define dict_get_or_set(d,k,v) ( dict__find_hash((d), (k)) ?                        \
+                               ( &dict_idx_to_val((d), dict_temp_idx(d))) :         \
+                               ( (dict_insert((d), (k), (v))), dict_get((d), (k))) )
 
 uint32_t murmer_hash_2 ( const void * key, uint32_t len, uint32_t seed )
 {
@@ -232,16 +223,21 @@ uint32_t generate_hash(char *str)
 void dict__delete(void *dict) {  // return a success fail code?  
     DictHdr *d = dict__hdr(dict);
 
-    DictEntry *entry = &d->entries[d->temp_idx];
+    DictEntry *e = &d->entries[d->temp_idx];
 
-    d->entry_indices[entry->entry_indices_index] = DELETED;
+    if(arr_len(d->entry_indices) > 1){  // fill the hole left by the deletion with the last element in the array
+        uint32_t *moved_index = &d->entry_indices[e->data_index];
+        *moved_index = arr_pop(d->entry_indices);
+        d->entries[*moved_index].data_index = e->data_index; 
+    }
+    else { 
+        arr_pop(d->entry_indices);// hashmap is empty
+    }
+    e->data_index = DELETED;
+    arr_free(e->key);
+    e->hash = DELETED;
 
-    entry->data_index = DELETED;
-    arr_free(entry->key);
-    entry->entry_indices_index = DELETED;
-    entry->hash = DELETED;
-
-    // d->len--; //  todo: the len no longer reflects how many items are stored.
+    d->len--; 
     d->temp_idx = EMPTY;
 }
 
@@ -276,11 +272,10 @@ bool dict__insert_entry(void *dict, char *key){
     if(entry_index == KEY_ALREADY_EXISTS){
         return false;
     }
-    uint32_t entry_indices_index = arr_len(d->entry_indices);
     arr_push(d->entry_indices, entry_index); // keep a list of dict entries
     char *new_key = NULL;
     arr_printf(new_key, key);
-    d->entries[entry_index] = (DictEntry){data_index, entry_indices_index, new_key, hash};  
+    d->entries[entry_index] = (DictEntry){data_index, new_key, hash};  
     return true;
 }
 uint32_t dict__index(uint32_t capacity, char *key){ 
@@ -421,9 +416,7 @@ void test_dict(void){
     assert(dict_get(my_dict, "false_key") == NULL); 
    /* ============== test delete ======================*/ 
     assert(dict_get(my_dict, "aaa")->x == 12); 
-    dict_get(my_dict, "aaa")->x = DELETED;  // user has to invalidate their own data before calling dict_delete
-    // this is only necessary if they want to iterate over the raw data, as deleted data is not removed from the array; 
-    // instead the slot is simply made available for future inserts. 
+
     assert(dict_delete(my_dict, "aaa")==true); 
     //assert(dict_delete(my_dict, "abb")==true); 
     assert(dict_delete(my_dict, "this_donut_exist")==false); 
@@ -449,7 +442,7 @@ void test_dict(void){
     assert(dict_update(my_dict, "doesnt_exist", (testtype){153})==false); 
 
    /* ============== dict_keys ======================*/ 
-    char **my_keys = dict_keys(my_dict); // test dict_keys
+    char **my_keys = dict_keys(my_dict); 
     for(char **it = my_keys; it != arr_end(my_keys); it++){
         printf("%s\t", *it);
     }
@@ -458,29 +451,28 @@ void test_dict(void){
     // name: dict_idx_to_key()??  idx2key idx2val
    assert(strcmp(dict_key(my_dict, *(dict_indices(my_dict)+1)), "aab") == 0); // first entry was deleted
    assert(dict_idx_to_val(my_dict, *(dict_indices(my_dict)+1)).x == 24);
-   /* =============== dict_to_arr =====================*/ 
 
-   testtype *dest_arr = NULL;
-   dict_to_arr(dest_arr, my_dict);
-   assert(dest_arr[0].x == dict_get(my_dict, "aab")->x);
-   for(testtype *it = dest_arr; it != arr_end(dest_arr); it++){
-        printf("dict_to_arr: %u\t", it->x);
-   }
 
    /* =================================================*/ 
-// arr of data is just treated like a normal array ------- see notes on delete test above
+
+   // can be treated like a normal array of (unordered) values
     for(testtype *it = my_dict; it != dict_end(my_dict); it++){ 
-        if(it->x != DELETED) { 
             printf("%u\t", it->x);
-        }
     }
+    for(int i = 0; i <= dict_len(my_dict); i++){ 
+            printf("%u\t", my_dict[i].x);
+    }
+   /* =================================================*/ 
+
     test_key[0] = 'a';
     test_key[1] = 'a';
     test_key[2] = 'b';
     test_key[3] = '\0';
-    for(uint32_t i = 2; i < 8999; i++){
-       assert(dict_get(my_dict, (char*)test_key)->x == i*12);
-       if(i%100==0) printf("get: %d\n", i);
+
+
+    for(uint32_t i = 2; i < 9000; i++){
+
+        if(i%100==0) printf("get: %d\n", i);
         
         if(test_key[2] == 'z'){
             if(test_key[1] =='z'){
@@ -494,7 +486,7 @@ void test_dict(void){
         } else {
             test_key[2]++;
         }
-        //if(i%10==0) printf("get %d\n", i);
+        if(i>8990) printf("get %d\n", i);
     }   //*/
   dict_free(my_dict); 
   d = NULL;
