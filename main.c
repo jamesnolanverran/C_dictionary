@@ -4,7 +4,7 @@
 #include "dict.h"
 
 int main(int argc, char **argv) {
-    test_dict();
+    // test_dict();
 
     int *new_dictionary = NULL;
     

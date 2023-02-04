@@ -1,4 +1,5 @@
 .vscode/*
+test.h
 build.bat
 *.org
 

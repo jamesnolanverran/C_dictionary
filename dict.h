@@ -9,16 +9,16 @@
 #include <string.h> 
 #include <stdbool.h> 
 
+
 // dynamic array
 // the dynamic array was written by Per Vognsen, from his wonderful Bitwise series:
 // https://www.youtube.com/playlist?list=PLU94OURih-CiP4WxKSMt3UcwMSDM3aTtX
 // based on Sean Barrett's stretchy buffers https://github.com/nothings/stb
 
-#ifndef ARR_H // todo: seperate out arr.h  ?
-
-typedef struct ArrHdr {
+typedef struct ArrHdr { // todo - separate out arr 
     uint32_t len;
     uint32_t cap;
+    uint8_t alignment_padding;
     char arr[]; 
 } ArrHdr;
 
@@ -30,7 +30,6 @@ void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size);
 char *arr__printf(char *arr, const char *fmt, ...);
 void arr_test(void);
 
-#endif // ARR_H
 
 // dictionary
 typedef struct DictEntry { 
@@ -45,6 +44,7 @@ typedef struct DictHdr {
     uint32_t temp_idx; // used to store an index used by macros
     uint32_t *entry_indices; // an arr of all dict entry locations by index, used for realloc 
     DictEntry *entries; // the actual hashtable - contains an index to data[]  
+    char padding0;
     char data[];  // where the raw data is stored
 } DictHdr;
 
@@ -65,8 +65,6 @@ void test_dict(void);
 /////////////////////////////
 
 // dynamic array & alloc wrappers
-#ifndef ARR_H  
-#define ARR_H
 
 #define MIN(x, y) ((x) <= (y) ? (x) : (y))
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
@@ -95,7 +93,11 @@ void *arr_malloc(size_t num_bytes) {
     }
     return ptr;
 }
-#define arr__hdr(a) ((ArrHdr *)((char *)(a) - offsetof(ArrHdr, arr))) 
+//ArrHdr *arr__hdr(void *a){
+//    return (ArrHdr *)( (char *)a - offsetof(ArrHdr, arr) - *((char*)a - 1) ) ;
+//}
+#define arr__hdr(a) ( (ArrHdr *)( (char *)(a) - offsetof(ArrHdr, arr) - *((char*)(a) - 1) ) )
+
 #define arr_len(a) ((a) ? arr__hdr(a)->len : 0)
 #define arr_cap(a) ((a) ? arr__hdr(a)->cap : 0)
 #define arr_end(a) ((a) + arr_len(a))
@@ -116,8 +118,7 @@ void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size) {
     uint32_t new_cap = MAX(16, MAX(1 + 2*arr_cap(arr), new_len));
     assert(new_len <= new_cap);
     assert(new_cap <= (SIZE_MAX - offsetof(ArrHdr, arr))/elem_size);
-    uint32_t new_size = offsetof(ArrHdr, arr) + new_cap*elem_size;
-    new_size = new_size + (new_size % 2);
+    uint32_t new_size = offsetof(ArrHdr, arr) + new_cap*elem_size +16; // add 16 for alignment padding
     ArrHdr *new_hdr;
     if (arr) {
         new_hdr = arr_realloc(arr__hdr(arr), new_size);
@@ -126,7 +127,11 @@ void *arr__grow(void *arr, uint32_t new_len, uint32_t elem_size) {
         new_hdr->len = 0;
     }   
     new_hdr->cap = new_cap;
-    return new_hdr->arr;
+
+    char alignment_padding = (uintptr_t)new_hdr->arr % 16 ? 16 - (uintptr_t)new_hdr->arr % 16 : 0; //align data[]
+    char *aligned_data = new_hdr->arr + alignment_padding;
+    *(aligned_data - 1) = alignment_padding; // store amount of padding at aligned_data - 1
+    return aligned_data;
 }
 
 char *arr__printf(char *arr, const char *fmt, ...) { 
@@ -146,7 +151,6 @@ char *arr__printf(char *arr, const char *fmt, ...) {
     arr__hdr(arr)->len += n - 1;
     return arr;
 }
-#endif // ALLOC_H
 
 //////////////////
 // c_dictionary
@@ -155,7 +159,11 @@ char *arr__printf(char *arr, const char *fmt, ...) {
 #define DELETED (UINT32_MAX -1)
 #define KEY_ALREADY_EXISTS (UINT32_MAX -2)
 
-#define dict__hdr(d) ((DictHdr *)((char *)(d) - offsetof(DictHdr, data))) 
+//#define arr__hdr(a) ( (ArrHdr *)( (char *)(a) - offsetof(ArrHdr, arr) - *((char*)(a) - 1) ) )
+DictHdr *dict__hdr(void *d){
+    return (DictHdr *)( (char *)d - offsetof(DictHdr, data) - *((char*)d - 1) ) ;
+}
+//#define dict__hdr(d) ((DictHdr *)((char *)(d) - offsetof(DictHdr, data) - *((char*)(d) - 1) ) ) 
 #define dict_temp_idx(d) ((d) ? dict__hdr(d)->temp_idx : EMPTY) // EMPTY is unreachable
 #define dict_cap(d) ((d) ? dict__hdr(d)->cap : 0)
 #define dict_entries(d) ((d) ? dict__hdr(d)->entries : 0)
@@ -302,8 +310,7 @@ bool dict__find_hash(void *dict, char *key){
 void dict__grow_entries(void *dict, size_t elem_size){
     DictHdr *d = dict__hdr(dict);
     uint32_t new_cap = dict_cap(dict);
-    uint32_t new_size = new_cap * (uint32_t)elem_size;
-    assert(new_size % 4 == 0);
+    uint32_t new_size = new_cap * (uint32_t)elem_size; 
     DictEntry *new_entries = arr_malloc(new_size);
     memset(new_entries, 0xff, new_size); 
     if (dict_len(dict)) { 
@@ -321,8 +328,7 @@ void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) {
     assert(dict_cap(dict) <= (SIZE_MAX - 1)/2); 
     assert(new_cap <= (SIZE_MAX - offsetof(DictHdr, data))/elem_size);
     uint32_t data_cap = new_cap / 3;  
-    size_t data_size = offsetof(DictHdr, data) + (data_cap * elem_size);
-    assert(data_size % 4 == 0);
+    size_t data_size = offsetof(DictHdr, data) + (data_cap * elem_size) + 16;
     DictHdr *new_hdr;
     if (!dict) { 
         new_hdr = arr_malloc(data_size);
@@ -334,8 +340,17 @@ void *dict__grow(void *dict, uint32_t new_cap, size_t elem_size) {
         new_hdr = arr_realloc(dict__hdr(dict), data_size);
     }
     new_hdr->cap = new_cap;
-    dict__grow_entries(new_hdr->data, sizeof(DictEntry));
-    return new_hdr->data;
+
+    char alignment_padding = (uintptr_t)new_hdr->data % 16 ? 16 - (uintptr_t)new_hdr->data % 16 : 0; //align data[]
+    char *aligned_data = new_hdr->data + alignment_padding;
+    *(aligned_data - 1) = alignment_padding; // store amount of padding 
+
+    dict__grow_entries(aligned_data, sizeof(DictEntry));
+    return aligned_data;
+/*
+
+
+*/
 }
 bool dict_key_exists(void *dict, char *key){
     DictHdr *d = dict__hdr(dict);
