@@ -2,9 +2,12 @@
 - C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
 
 > :warning: **Disclaimer: Work in Progress**
-- C_Dictionary is currently in a developmental stage. Use at your own risk.
+
+> C_Dictionary is currently in a developmental stage. Use at your own risk.
+
 ### Developer Friendly Design
 - C_Dictionary emphasizes developer velocity, quick iterations, and effortless prototyping.
+
 ### Dynamic Types and Memory
 - Dynamic typing and dynamic memory offer the ease and flexibility of higher-level languages, while minimizing setup time and eliminating boilerplate.
 
