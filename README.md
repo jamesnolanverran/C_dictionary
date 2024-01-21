@@ -5,19 +5,19 @@ C_Dictionary is a hashmap library, designed for fast key-value storage and retri
 
 > C_Dictionary is currently in a developmental stage. Use at your own risk.
 
-### Developer Friendly Design
+#### Developer Friendly Design
 - C_Dictionary emphasizes developer velocity, quick iterations, and effortless prototyping.
 
-### Dynamic Types and Memory
+#### Dynamic Types and Memory
 - Dynamic typing and dynamic memory offer the ease and flexibility of higher-level languages, while minimizing setup time and eliminating boilerplate.
 
-### Key Flexibility
+#### Key Flexibility
 - C_Dictionary supports keys of any data type without requiring additional boilerplate.
 
-### Contiguous Array
+#### Contiguous Array
 - Data is stored in a contiguous array, useful for bulk processing. This layout ensures fewer cache misses, crucial for high-speed data access and processing.
 
-### Index Stability
+#### Index Stability
 - Stable indexing ensures that the indices of elements remain constant after deletions or reallocations which can be important for applications that require persistent references to data elements.
 
 ```c
@@ -122,35 +122,36 @@ int main() {
     return 0;
 }
 ```
-## How It Works: C_Dictionary
+## How It Works
 
-### Stretchy Buffer Technique
-C_Dictionary uses the stretchy buffer technique, incorporating struct headers, macros, and Flexible Array Members. This enables dynamic typing and memory management with minimal boilerplate. The hashmap buffer stores hashes and indices, where the indices point to data within a separate flexible array member. 
+#### Stretchy Buffer Technique
+- C_Dictionary uses the stretchy buffer technique, incorporating struct headers, macros, and Flexible Array Members. This enables dynamic typing and memory management with minimal boilerplate. The hashmap buffer stores hashes and indices, where the indices point to data within a separate flexible array member. 
 
-### Macro Implementation
+#### Macro Implementation
 - The library's macros are structured to output expressions, utilizing the comma operator and ternary expressions. This design enables them to effectively return values. The temp_idx field in the Dictionary header facilitates indirect index communication between functions within a macro. This avoids the need for direct variable passing, ensuring that the macros function as expressions rather than statements.
 
-### Dictionary Declaration and Initialization
+#### Dictionary Declaration and Initialization
 - Declare a dictionary with just a type, like int *my_int_dict = NULL. Initial allocation and setup are automatically performed on the first insert, returning the flexible array member (e.g., int* in this case). This design simplifies usage and manages memory efficiently.
 
-### Data Retrieval and Reallocation
+#### Data Retrieval and Reallocation
 - Use dict_get to obtain an index, ideal for scenarios where dynamic reallocation could invalidate pointers. For immediate data access, dict_get_ptr() returns a direct pointer. When handling indices, access data by treating the dictionary handle as an array.
 
-### Hashing and Key Typing
+#### Hashing and Key Typing
 - Keys can be of any type, interpreted as raw bytes from void pointers. This approach trades some type safety, a less critical aspect for keys, for simplicity and versatility in use. C_Dictionary uses MurmerHash2.
 
-### String Key Management
+#### String Key Management
 String keys are supported with specialized functions: dict_keystr_insert, dict_keystr_get, dict_keystr_get_ptr, dict_keystr_delete. This approach accommodates string's variable lengths by allowing users to specify the length.
 
-### Deletion and Memory Management
+#### Deletion and Memory Management
 - Deletion flags an entry as deleted without erasing the data, reallocating its slot to a free list. Subsequent inserts use these free slots before expanding the data array. Manual data invalidation is required for direct data array iteration. This method preserves index stability.
 
-### Drawbacks
+#### Drawbacks
 - Risk of pointer invalidation from data reallocation; using indices is safer.
 - Direct data iteration post-deletion needs manual data invalidation; consider a helper function for automation.
 - Indirection due to separate hash and data arrays.
 
-## Todos
+---
+### Todos
 - 'index unstable' deletion option for data array with no invalid slots.
 - dict_init() - optional function to allow for user specified initial allocation, load factor, and other settings.
 - option to allow users to use a hashing function of their choice.
