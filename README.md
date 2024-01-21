@@ -131,7 +131,7 @@ int main() {
 - The library's macros are structured to output expressions, utilizing the comma operator and ternary expressions. This design enables them to effectively return values. The temp_idx field in the Dictionary header facilitates indirect index communication between functions within a macro. This avoids the need for direct variable passing, ensuring that the macros function as expressions rather than statements.
 
 #### Dictionary Declaration and Initialization
-- Declare a dictionary with just a type, like int *my_int_dict = NULL. Initial allocation and setup are automatically performed on the first insert, returning the flexible array member (e.g., int* in this case). This design simplifies usage and manages memory efficiently.
+- Declare a dictionary with just a type, like int \*my_int_dict = NULL. Initial allocation and setup are automatically performed on the first insert, returning the flexible array member (e.g., int\* in this case). This design simplifies usage and manages memory efficiently.
 
 #### Data Retrieval and Reallocation
 - Use dict_get to obtain an index, ideal for scenarios where dynamic reallocation could invalidate pointers. For immediate data access, dict_get_ptr() returns a direct pointer. When handling indices, access data by treating the dictionary handle as an array.
@@ -140,7 +140,7 @@ int main() {
 - Keys can be of any type, interpreted as raw bytes from void pointers. This approach trades some type safety, a less critical aspect for keys, for simplicity and versatility in use. C_Dictionary uses MurmerHash2.
 
 #### String Key Management
-String keys are supported with specialized functions: dict_keystr_insert, dict_keystr_get, dict_keystr_get_ptr, dict_keystr_delete. This approach accommodates string's variable lengths by allowing users to specify the length.
+- String keys are supported with specialized functions: dict_keystr_insert, dict_keystr_get, dict_keystr_get_ptr, dict_keystr_delete. This approach accommodates string's variable lengths by allowing users to specify the length.
 
 #### Deletion and Memory Management
 - Deletion flags an entry as deleted without erasing the data, reallocating its slot to a free list. Subsequent inserts use these free slots before expanding the data array. Manual data invalidation is required for direct data array iteration. This method preserves index stability.
