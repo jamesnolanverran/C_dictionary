@@ -39,16 +39,16 @@ int main() {
     // Insert vectors into the dictionary with keys
     int some_key = 10;
     int another_key = 11;
-    dict_insert(vec_dict, some_key, vec1);
-    dict_insert(vec_dict, another_key, vec2);
+    dict_insert(vec_dict, &some_key, vec1);
+    dict_insert(vec_dict, &another_key, vec2);
 
     // Retrieve a vector from the dictionary
-    Vector *v = dict_get_ptr(vec_dict, another_key);  
+    Vector *v = dict_get_ptr(vec_dict, &another_key);  
     printf("Vector with key %d: (%d, %d)\n", another_key, v->x, v->y);
 
     // pointers can become invalid if the hashmap is reallocated. 
     // We use indicies instead
-    int index = dict_get(vec_dict, some_key);
+    int index = dict_get(vec_dict, &some_key);
     printf("Vector indexed: %d\n", vec_dict[index].x);
     
     // Iterate over all vectors in the dictionary
@@ -58,8 +58,8 @@ int main() {
     }
 
     // Delete a vector from the dictionary
-    int deleted_idx = dict_delete(vec_dict, some_key);
-    assert(dict_get(vect_dict, some_key) == -1); // returns -1 if there is no entry found
+    int deleted_idx = dict_delete(vec_dict, &some_key);
+    assert(dict_get(vect_dict, &some_key) == -1); // returns -1 if there is no entry found
 
     // if we intend to iterate over the data we must mark deleted data as invalid
     vec_dict[deleted_idx].x = -1; // mark the Vector invalid
@@ -83,7 +83,7 @@ int main() {
     KeyAndVector *key_val_dict = NULL;
 
     // Insert a key-value pair into the hashmap.
-    dict_insert(key_val_dict, some_key, (KeyAndVector){some_key, vec1});
+    dict_insert(key_val_dict, &some_key, (KeyAndVector){some_key, vec1});
     
     //////////////////
     //////////////////
