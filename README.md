@@ -1,6 +1,7 @@
 # C_Dictionary
-C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
----
+
+#### C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
+
 > :warning: **Disclaimer: Work in Progress**
 
 > C_Dictionary is currently in a developmental stage. Use at your own risk.
