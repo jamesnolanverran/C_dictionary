@@ -2,22 +2,22 @@
 > C_Dictionary is currently in a developmental stage. Use at your own risk.
 
 # C_Dictionary
-C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
+- C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
 
 ## Developer Friendly Design
-C_Dictionary emphasizes developer velocity, quick iterations, and effortless prototyping.
+- C_Dictionary emphasizes developer velocity, quick iterations, and effortless prototyping.
 
 ### Dynamic Types and Memory
-Dynamic typing and dynamic memory offer the ease and flexibility of higher-level languages, while minimizing setup time and eliminating boilerplate.
+- Dynamic typing and dynamic memory offer the ease and flexibility of higher-level languages, while minimizing setup time and eliminating boilerplate.
 
 ### Key Flexibility
-C_Dictionary supports keys of any data type without requiring additional boilerplate.
+- C_Dictionary supports keys of any data type without requiring additional boilerplate.
 
 ### Contiguous Array
-Data is stored in a contiguous array, useful for bulk processing. This layout ensures fewer cache misses, crucial for high-speed data access and processing.
+- Data is stored in a contiguous array, useful for bulk processing. This layout ensures fewer cache misses, crucial for high-speed data access and processing.
 
 ### Index Stability
-Stable indexing ensures that the indices of elements remain constant after deletions or reallocations which can be important for applications that require persistent references to data elements.
+- Stable indexing ensures that the indices of elements remain constant after deletions or reallocations which can be important for applications that require persistent references to data elements.
 
 ```c
 #include "dict.h"  // Include the C_Dictionary header
