@@ -149,7 +149,7 @@ int main() {
 #### Drawbacks
 - Risk of pointer invalidation from data reallocation; using indices is safer.
 - Direct data iteration post-deletion needs manual data invalidation; consider a helper function for automation.
-- Indirection due to separate hash and data arrays.
+- Indirection due to separate hash and data arrays, uses dynamic arrays internall to keep track of indices and the free list.
 
 ---
 ### Todos
