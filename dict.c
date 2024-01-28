@@ -13,30 +13,14 @@
 #define KEY_ALREADY_EXISTS (0xffffffffui32 - 2)
 #define offset_of(type, member) ((size_t) &(((type *)0)->member))
 
-void *dict_calloc(size_t num_elems, size_t elem_size) {
-    void *ptr = calloc(num_elems, elem_size);
-    if (!ptr) {
-        perror("dict_calloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-void *dict_realloc(void *ptr, size_t num_bytes) {
-    ptr = realloc(ptr, num_bytes);
-    if (!ptr) {
-        perror("dict_realloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-void *dict_malloc(size_t num_bytes) {
-    void *ptr = (void*)malloc(num_bytes);
-    if (!ptr) {
-        perror("dict_malloc failed");
-        exit(1);
-    }
-    return ptr;
-}
+// void *dict_malloc(size_t num_bytes) {
+//     void *ptr = (void*)malloc(num_bytes);
+//     if (!ptr) {
+//         perror("dict_malloc failed");
+//         exit(1);
+//     }
+//     return ptr;
+// }
 
 DictHdr *dict__hdr(void *d){
     return (DictHdr *)( (char *)d - offset_of(DictHdr, data) - *((char*)d - 1) ) ;
@@ -77,45 +61,39 @@ static int dict__generate_hash(void *key, size_t key_size) {
 static int dict__find_empty_slot(DictEntry *entries, int hash, int capacity){
     int idx = hash % capacity;
     int j = capacity;
-    int existing_hash;  
     while(true){
         if( j-- == 0) assert(false); // unreachable
-        existing_hash = entries[idx].hash;
-        if(existing_hash == hash){
-            return KEY_ALREADY_EXISTS;
-        }
-        if(existing_hash == EMPTY || existing_hash == DELETED){
+        if(entries[idx].data_index == EMPTY || entries[idx].data_index == DELETED){
             return idx;
+        }
+        if(entries[idx].hash == hash){
+            return KEY_ALREADY_EXISTS;
         }
         idx += 1;
         if(idx >= capacity){
             idx = 0;
         }
     }
-    return idx;
 }
 // Grows the entry array of the dictionary to accommodate more elements.
-static void dict__grow_entries(void *dict, size_t elem_size) {
+static void dict__grow_entries(void *dict, int new_cap, size_t elem_size) {
     DictHdr *d = dict__hdr(dict); // Retrieve the dictionary header
-    int new_cap = dict_cap(dict); // Determine the new capacity
     int new_size = new_cap * (int)elem_size; // Calculate the new size in bytes for the entries
-    DictEntry *new_entries = dict_malloc(new_size); // Allocate new memory for the entries
-    memset(new_entries, 0xff, new_size); // Initialize all bits to 1 (typically used for EMPTY marker)
-
+    DictEntry *new_entries = malloc(new_size); // Allocate new memory for the entries
+    if (!new_entries) {
+        perror("malloc failed");
+        exit(1);
+    }
+    memset(new_entries, 0xff, new_size); // Initialize all bits to 1 (used for EMPTY marker)
     // If the dictionary has existing entries, rehash them into the new entry array
     if (dict_count(dict)) {
-        int *new_entry_indices = NULL; // Array to store new indices of entries
-        for (int *it = d->entry_indices; it != darr_end(d->entry_indices); it++) {
-            if (d->entries[*it].hash == DELETED) {
-                continue; // Skip deleted entries
-            }
+        for (int i = 0; i < d->cap; i++) {
+            if(d->entries[i].data_index == EMPTY) continue; // Skip empty entries
+            if(d->entries[i].data_index == DELETED) continue; // Skip deleted entries
             // Find a new empty slot for the entry and update its position
-            int new_index = dict__find_empty_slot(new_entries, d->entries[*it].hash, new_cap);
-            new_entries[new_index] = d->entries[*it];
-            darr_push(new_entry_indices, new_index); // Store the new index
+            int new_index = dict__find_empty_slot(new_entries, d->entries[i].hash, new_cap);
+            new_entries[new_index] = d->entries[i];
         }
-        darr_free(d->entry_indices); // Free the old index array
-        d->entry_indices = new_entry_indices; // Update to the new index array
     }
     // Replace the old entry array with the new one
     if (d->entries) {
@@ -132,17 +110,23 @@ void *dict__grow(void *dict, int new_cap, size_t elem_size) {
     DictHdr *new_hdr;
     // Allocate a new header if the dictionary is empty, or resize the existing one
     if (!dict) {
-        new_hdr = dict_malloc(data_size);
+        new_hdr = malloc(data_size);
+        if (!new_hdr) {
+            perror("malloc failed");
+            exit(1);
+        }
         // Initialize the new header
         new_hdr->len = 0;
         new_hdr->temp_idx = EMPTY;
-        new_hdr->entry_indices = NULL;
         new_hdr->entries = NULL;
         new_hdr->free_list = NULL;
     } else {
-        new_hdr = dict_realloc(dict__hdr(dict), data_size);
+        new_hdr = realloc(dict__hdr(dict), data_size);
+        if (!new_hdr) {
+            perror("realloc failed");
+            exit(1);
+        }
     }
-    new_hdr->cap = new_cap; // Update the capacity
 
     // Calculate and apply alignment padding to the data array
     char alignment_padding = (16 - ((uintptr_t)new_hdr->data & 15)) & 15; // Align data[]
@@ -150,7 +134,8 @@ void *dict__grow(void *dict, int new_cap, size_t elem_size) {
     *(aligned_data - 1) = alignment_padding; // Store the amount of padding
 
     // Grow the entries to fit into the newly allocated space
-    dict__grow_entries(aligned_data, sizeof(DictEntry));
+    dict__grow_entries(aligned_data, new_cap, sizeof(DictEntry));
+    new_hdr->cap = new_cap;
     return aligned_data; // Return the aligned data pointer
 }
 void dict__free(void *dict){
@@ -159,7 +144,6 @@ void dict__free(void *dict){
         if(d->entries) {
             free(d->entries); 
         }
-        if(d->entry_indices) darr_free(d->entry_indices);
         if(d->free_list) darr_free(d->free_list);
         free(dict__hdr(dict));
     }
@@ -168,9 +152,8 @@ void dict__free(void *dict){
 void dict_clear(void *dict){
     if(!dict) return;
     DictHdr *d = dict__hdr(dict);
-    darr_clear(dict__hdr(d)->entries);
-    darr_clear(dict__hdr(d)->entry_indices);
-    darr_clear(dict__hdr(d)->free_list);
+    darr_clear(d->entries);
+    darr_clear(d->free_list);
     d->len = 0;
 }
 bool dict__insert_entry(void *dict, void *key, size_t key_size){ 
@@ -181,7 +164,6 @@ bool dict__insert_entry(void *dict, void *key, size_t key_size){
     if(entry_index == KEY_ALREADY_EXISTS){
         return false;
     }
-    darr_push(d->entry_indices, entry_index); // keep a list of dict entries -- needed when reallocating
     d->entries[entry_index] = (DictEntry){data_index, hash};  
     // we use a free list to keep track of empty slots in the data array from deletions. Use those first. 
     d->temp_idx = darr_len(d->free_list) ? darr_pop(d->free_list) : d->len;
@@ -203,15 +185,13 @@ static int dict__get_entry_index(void *dict, void *key, size_t key_size){
     int hash = dict__generate_hash(key, key_size); // Generate a hash value for the given key.
     int idx = hash % d->cap; // Calculate the initial index to start the search in the hash table.
     int j = d->cap; // Counter to ensure the loop doesn't iterate more than the capacity of the dictionary.
-    int candidate_hash; // Variable to store the hash of the current candidate entry.
 
     while(true) { // Loop to search for the key in the dictionary.
         if(j-- == 0) assert(false); // Fail-safe to avoid infinite loops. Should be unreachable if logic is correct.
-        candidate_hash = d->entries[idx].hash; // Retrieve the hash of the current entry at index idx.
-        if(candidate_hash == EMPTY) {  // If the entry is empty, the key is not in the dictionary.
+        if(d->entries[idx].data_index == EMPTY) {  // If the entry is empty, the key is not in the dictionary.
             return -1;
         }
-        if(candidate_hash == hash) { // If the hash matches, the correct entry has been found.
+        if(d->entries[idx].hash == hash) { // If the hash matches, the correct entry has been found.
             return idx;
         }
         idx += 1; // Move to the next index, wrapping around to the start if necessary.
@@ -256,11 +236,12 @@ int dict__delete(void *dict, void *key, size_t key_size){
     int idx = dict__get_entry_index(dict, key, key_size);
     if(idx == -1) return -1;
     DictHdr *d = dict__hdr(dict);
-    d->entries[idx].hash = DELETED;
-    darr_push(d->free_list, d->entries[idx].data_index);
+    int data_index = d->entries[idx].data_index;
+    d->entries[idx].data_index = DELETED;
+    darr_push(d->free_list, data_index);
     d->len -= 1; 
     // return the data index of the deleted entry. Caller may wish to mark data as invalid
-    return d->entries[idx].data_index;
+    return data_index;
 }
 int dict_keystr_delete(void *dict, void *key, size_t key_size){
     return dict__delete(dict, key, key_size);
