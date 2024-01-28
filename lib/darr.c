@@ -11,54 +11,30 @@
 #define MAX(x, y) ((x) >= (y) ? (x) : (y))
 
 DarrHdr *darr__hdr(void *arr) { return (DarrHdr*)( (char*)(arr) - offsetof(DarrHdr, arr) - *((char*)(arr) - 1)); }
-int darr_len(void *a) { return a ? darr__hdr(a)->len : 0; }
-int darr_cap(void *a) { return a ? darr__hdr(a)->cap : 0; }
-void darr_clear(void *a) { if (a)  darr__hdr(a)->len = 0; }
 void darr__free(void *a){ free(darr__hdr(a)); }
 
-void *darr_calloc(size_t num_elems, size_t elem_size) {
-    void *ptr = calloc(num_elems, elem_size);
-    if (!ptr) {
-        perror("darr_calloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-void *darr_realloc(void *ptr, size_t num_bytes) {
-    ptr = realloc(ptr, num_bytes);
-    if (!ptr) {
-        perror("darr_realloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-void *darr_malloc(size_t num_bytes) {
-    void *ptr = (void*)malloc(num_bytes);
-    if (!ptr) {
-        perror("darr_malloc failed");
-        exit(1);
-    }
-    return ptr;
-}
 void *darr__init(void *arr, unsigned int initial_capacity, float growth_factor, int elem_size){
-    if(arr) assert(0 && "unreachable - darr__init - array already exists");
+    if(arr) assert(0 && "unreachable - darr__init: array already exists");
     assert(growth_factor == 0 || growth_factor > 1.0);
 
     int new_cap = initial_capacity ? initial_capacity : 16;
     int new_size = offsetof(DarrHdr, arr) + new_cap * elem_size + 16; // add 16 bits for alignment padding
 
     DarrHdr *new_hdr;
-    new_hdr = darr_malloc(new_size);
+    new_hdr = malloc(new_size);
+    if (!new_hdr) {
+        perror("malloc failed");
+        exit(1);
+    }
     new_hdr->len = 0;
     new_hdr->cap = new_cap;
     new_hdr->growth_factor = growth_factor ? growth_factor : 2;
     new_hdr->min_size = new_cap;
     // todo - don't use modulo to align data, use bitwise ops
-    char alignment_padding = ((unsigned long long)new_hdr->arr % 16) ? (16 - (unsigned long long)new_hdr->arr % 16) : 0; //align data[]
+    char alignment_padding = (16 - ((unsigned long long)new_hdr->arr & 15)) & 15; // Align data[]
     char *aligned_data = new_hdr->arr + alignment_padding;
     *(aligned_data - 1) = alignment_padding; // store amount of padding at aligned_data - 1
     return aligned_data;
-
 }
 void *darr__grow(void *arr, unsigned int new_len, unsigned int elem_size) {
     assert(darr_cap(arr) <= (SIZE_MAX - 1)/2);
@@ -78,9 +54,17 @@ void *darr__grow(void *arr, unsigned int new_len, unsigned int elem_size) {
     int new_size = offsetof(DarrHdr, arr) + (new_cap * elem_size) + 16; // add 16 for alignment padding
     DarrHdr *new_hdr;
     if (arr) {
-        new_hdr = darr_realloc(darr__hdr(arr), new_size);
+        new_hdr = realloc(darr__hdr(arr), new_size);
+        if (!new_hdr) {
+            perror("realloc failed");
+            exit(1);
+        }
     } else {
-        new_hdr = darr_malloc(new_size);
+        new_hdr = malloc(new_size);
+        if (!new_hdr) {
+            perror("malloc failed");
+            exit(1);
+        }
         new_hdr->len = 0;
         new_hdr->growth_factor = growth_factor;
         new_hdr->min_size = min_size;
@@ -92,7 +76,6 @@ void *darr__grow(void *arr, unsigned int new_len, unsigned int elem_size) {
     *(aligned_data - 1) = alignment_padding; // store amount of padding at aligned_data - 1
     return aligned_data;
 }
-
 char *darr__printf(char *arr, const char *fmt, ...) { 
     va_list args;
     va_start(args, fmt);
