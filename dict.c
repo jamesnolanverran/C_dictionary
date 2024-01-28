@@ -1,7 +1,7 @@
 #include <stdlib.h> 
 #include <string.h> 
 #include <stdbool.h> 
-#include "darr.h"
+#include "lib/darr.h"
 #include "dict.h"
 
 #define stmnt(s) do { s } while (0)
