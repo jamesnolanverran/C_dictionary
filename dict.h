@@ -10,9 +10,8 @@ typedef struct DictEntry {
 typedef struct DictHdr {
     int len; 
     int cap;
-    int temp_idx; // used to store an index used by macros
-    int *entry_indices; // arr of all dict entry locations by index, used for realloc 
-    int *free_list; // arr of indices to *entries that have been deleted. todo: finish and test.
+    int temp_idx; // stores an index used by macros
+    int *free_list; // arr of indices to *entries that have been deleted. 
     DictEntry *entries; // the actual hashtable - contains an index to data[] where the values are stored and a hash
     char padding; // some padding for alignment
     char data[];  // aligned data array - where the raw data is stored
@@ -44,7 +43,7 @@ static inline int dict_cap(void *d);
 // Note: caller should ensure 'd' is valid
 #define dict__idx_to_val(d,idx) ( (d)[ dict__entries(d)[(idx)].data_index ] )  
 // if the number of entries is more than half the size of the capacity, double the capacity.
-#define INITIAL_CAPACITY 256
+#define INITIAL_CAPACITY 64
 #define dict__fit(d, n) ((n) * 2 < dict_cap(d) ? 0 : ((d) = dict__grow((d), ((d) ? 2 * dict_cap(d) : INITIAL_CAPACITY), sizeof(*(d)))))
 ////////////////////////////////////////////
 ////////////////////////////////////////////
