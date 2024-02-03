@@ -1,6 +1,6 @@
 # C_Dictionary
 
-A zero friction hashmap library for C. 
+#### A zero friction hashmap library for C. 
 
 ```c
 // create a hashmap
