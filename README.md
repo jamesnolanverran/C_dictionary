@@ -1,6 +1,16 @@
 # C_Dictionary
 
-#### C_Dictionary is a hashmap library, designed for fast key-value storage and retrieval. It allows for efficient data lookup and manipulation, making it a versatile tool for a wide range of applications.
+A zero friction hashmap library for C. 
+
+```c
+// create a hashmap
+int *my_dict = NULL;
+
+// start using it
+dict_insert(my_dict, &some_key, 42);
+```
+
+#### C_Dictionary is a hashmap library for fast key-value storage and retrieval. 
 
 > :warning: **Disclaimer: Work in Progress**
 
