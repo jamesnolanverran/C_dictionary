@@ -159,7 +159,7 @@ int main() {
 #### Drawbacks
 - Risk of pointer invalidation from data reallocation; using indices is safer.
 - Direct data iteration post-deletion needs manual data invalidation; consider a helper function for automation.
-- Indirection due to separate hash and data arrays, uses dynamic arrays internally to keep track of the free list.
+- Some indirection due to separate hash and data arrays. C_Dict also uses a dynamic array internally to keep track of the free list.
 
 ---
 ### Todos
