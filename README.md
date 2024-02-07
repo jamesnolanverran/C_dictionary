@@ -164,5 +164,5 @@ int main() {
 ---
 ### Todos
 - 'index unstable' deletion option for data array with no invalid slots.
-- dict_init() - optional function to allow for user specified initial allocation, load factor, and other settings.
+- dict_init() - optional function to allow for user specified initial allocation, load factor, alignment, and other settings.
 - option to allow users to use a hashing function of their choice.
