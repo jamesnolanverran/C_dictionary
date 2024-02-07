@@ -72,7 +72,7 @@ int main() {
     int deleted_idx = dict_delete(vec_dict, &some_key);
     assert(dict_get(vect_dict, &some_key) == -1); // returns -1 if there is no entry found
 
-    // if we intend to iterate over the data we must mark deleted data as invalid
+    // if we intend to iterate directly over the data we must mark deleted data as invalid
     vec_dict[deleted_idx].x = -1; // mark the Vector invalid
     // Iterate over the dictionary, skipping invalid vectors
     printf("Vectors after deletion:\n");
